@@ -24,10 +24,10 @@ spec:
         - name: MONGO_INITDB_ROOT_PASSWORD
           value: devdb@123
         volumeMounts:
-        - name: dada                    # same as volumes name 
+        - name: dada                    # same name as volumes name 
           mountPath: /data/db
       volumes:
-      - name: dada                       #same volumeMount name
+      - name: dada                       #same name as volumeMount name
         persistentVolumeClaim:
           claimName: aws-pvc              #same as PVC name
 ---
@@ -44,7 +44,7 @@ spec:
     protocol: TCP
     port: 27017
     targetPort: 27017
-
+#Make sure  to open port 27017, 80 and 8080 on worker NODES SG
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

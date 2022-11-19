@@ -1,0 +1,218 @@
+DEPLOYING MULTIPLE APPLICATION
+*******************************
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: springappdeployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: springapp
+  template:
+    metadata:
+      name: springapppod
+      labels:
+        app: springapp
+    spec:
+      containers:
+      - name: springappcontainer
+        image: mylandmarktech/spring-boot-mongo
+        ports:
+        - containerPort: 8080
+        env:
+        - name: MONGO_DB_USERNAME
+          value: devdb
+        - name: MONGO_DB_PASSWORD
+          value: devdb@123
+        - name: MONGO_DB_HOSTNAME
+          value: mongo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: springapp
+spec:
+  selector:
+    app: springapp
+  ports:
+  - port: 80
+    targetPort: 8080
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodbpvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 16Gi
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: mongodbrs
+spec:
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+     metadata:
+       name: mongodbpod
+       labels:
+         app: mongodb
+     spec:
+       volumes:
+       - name: pvc
+         persistentVolumeClaim:
+           claimName: mongodbpvc
+       containers:
+       - name: mongodbcontainer
+         image: mongo
+         ports:
+         - containerPort: 27017
+         env:
+         - name: MONGO_INITDB_ROOT_USERNAME
+           value: devdb
+         - name: MONGO_INITDB_ROOT_PASSWORD
+           value: devdb@123
+         volumeMounts:
+         - name: pvc
+           mountPath: /data/db
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+spec:
+  type: ClusterIP
+  selector:
+    app: mongodb
+  ports:
+  - port: 27017
+    targetPort: 27017
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: javasvc
+spec:
+  type: ClusterIP
+  selector:
+    app: java
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: javaapp
+  labels:
+    app: java
+spec:
+  containers:
+  - name: javaapp
+    image: mylandmarktech/java-web-app
+    ports:
+    - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: appsvc
+spec:
+  type: ClusterIP
+  selector:
+    app: fe
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: javaapp22
+  labels:
+    app: fe
+spec:
+  containers:
+  - name: javaapp
+    image: mylandmarktech/maven-web-app
+    ports:
+    - containerPort: 8080
+*******************************************************************************************
+ubuntu@ip-172-20-57-176:~$ kubectl apply -f app
+deployment.apps/springappdeployment created
+service/springapp created
+persistentvolumeclaim/mongodbpvc unchanged
+replicaset.apps/mongodbrs created
+service/mongo created
+service/javasvc created
+pod/javaapp created
+service/appsvc created
+pod/javaapp22 created
+deployment.apps/myapp created
+
+Path-based routing:
+ ideal for microservices
+    dominionapps.net/
+    dominionapps.net/login 
+    dominionapps.net/registration
+    dominionapps.net/account
+    dominionapps.net/transfer
+    dominionapps.net/payBills
+
+Host-based routing:
+  host: dominionapps.net/
+  backend:
+    service: springapp  
+  host: app.dominionapps.net/
+  backend:
+    service: myapp  
+
+
+Deploying Ingress Rules/Service: This will give our end clients domain name instead of using IP
+**********************************************************************************************
+
+vi ingress.sh 
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: myingress
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: springapp.dominionapps.net  #Domain name service for clients (Route53)
+    http:
+      paths:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            name: springapp    #Selector and label name for desired application
+            port:
+              number: 80
+  - host: app.dominionapps.net    #Domain name service for clients (Route53) 
+    http:
+      paths:
+      - pathType: Prefix
+        path: /maven-web-app
+        backend:
+          service:
+            name: appsvc
+            port:
+              number: 80
+  - host: java.dominionapps.net
+    http:
+      paths:
+      - pathType: Prefix
+        path: /java-web-app
+        backend:
+          service:
+            name: javasvc
+            port:
